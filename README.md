@@ -17,21 +17,24 @@ it uses cmd line tools like 'am'(activity manager) and 'pm'(package manager) for
 
 # installation #
 
-    1. Building from source 
-    to build the tool from source make sure you have rust installed.
-    ```bash 
-    apt install rust -y 
-    ```
-    also make sure you do 
-    ```bash 
-    termux-setup-storage 
-    ```
-    and restart termux.then you can just 
-    ```bash 
-    Cargo build --release
-    ```
-    the resultant binary wiil be in `target/release/tx_launch`
+1. Building from source 
+ to build the tool from source make sure you have rust installed.
 
-    2. Download the binary
-    if you do not want to build it and you can download it from the releases section
-    https://github.com/BayonetArch/tx_launch/releases
+```bash 
+ apt install rust -y 
+ ```
+ also make sure you do 
+
+ ```bash 
+ termux-setup-storage 
+ ```
+ and restart termux.then you can just 
+
+```bash 
+ Cargo build --release
+```
+the resultant binary wiil be in `target/release/tx_launch`
+
+ 2. Download the binary
+ if you do not want to build it and you can download it from the releases section
+           https://github.com/BayonetArch/tx_launch/releases

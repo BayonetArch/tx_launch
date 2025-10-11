@@ -41,6 +41,6 @@ git clone https://github.com/BayonetArch/tx_launch.git
 ```
 the resultant binary wiil be in `target/release/tx_launch`
 
- 2. Download the binary
+ 2. Download the binary<br>
  if you do not want to build it and you can download it from the releases section
            https://github.com/BayonetArch/tx_launch/releases

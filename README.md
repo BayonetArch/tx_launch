@@ -16,9 +16,8 @@ it uses cmd line tools like 'am'(activity manager) and 'pm'(package manager) for
     or download from official termux-app github repo
 
 # installation #
-
-1. Building from source 
- to build the tool from source make sure you have rust installed.
+1.Building from source<br>
+  to build the tool from source make sure you have rust installed.
 
 ```bash 
  apt install rust -y 
@@ -28,7 +27,14 @@ it uses cmd line tools like 'am'(activity manager) and 'pm'(package manager) for
  ```bash 
  termux-setup-storage 
  ```
- and restart termux.then you can just 
+ and restart termux.clone the repo:
+ ```bash
+git clone https://github.com/BayonetArch/tx_launch.git
+```
+ 
+ 
+ 
+ then you can just 
 
 ```bash 
  Cargo build --release

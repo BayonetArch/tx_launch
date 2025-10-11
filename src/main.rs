@@ -375,8 +375,10 @@ fn incompatible_warning(sdk: u8) {
         EscAttr::yellow(true),
         EscAttr::none()
     );
-    eprintln!("  expected: 29,got:{}", sdk);
-    eprintln!("  Keep in mind that apps might not run");
+    eprintln!("  Expected: 29 or lower");
+    eprintln!("  Found: {}", sdk);
+    eprintln!("  Note: apps may not run  on this version.");
+    eprintln!();
 }
 
 fn legacy_warning() {
@@ -522,12 +524,9 @@ fn main() -> anyhow::Result<()> {
     }
 
     if *am == Am::system() {
-        let sdk = run_cmd(
-            "/system/bin/getprop getprop ro.build.version.sdk
-",
-        )?;
+        let sdk = run_cmd("/system/bin/getprop ro.build.version.sdk")?;
 
-        if let Ok(sdk) = sdk.parse::<u8>() {
+        if let Ok(sdk) = sdk.trim().parse::<u8>() {
             if sdk > 29 {
                 incompatible_warning(sdk);
             }

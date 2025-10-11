@@ -23,6 +23,7 @@ const PKGS_CMD: &'static str = "/system/bin/pm list packages --user 0 -3 | cut -
 const PATH_CMD: &'static str = "/system/bin/pm path --user 0";
 const INTENT_CMD: &'static str = "/system/bin/pm resolve-activity --user 0";
 const AAPT_CMD: &'static str = "aapt dump badging";
+const EXTRA_PKG: usize = 3;
 
 static ACTMANAGER: LazyLock<Mutex<Am>> = std::sync::LazyLock::new(|| Mutex::new(Am::default()));
 
@@ -72,6 +73,12 @@ impl Package {
     fn playstore() -> Self {
         let intent = Some("com.android.vending.AssetBrowserActivity".to_string());
         let pack_name = "com.android.vending".to_string();
+        Self { intent, pack_name }
+    }
+
+    fn youtube() -> Self {
+        let intent = Some(r"com.google.android.youtube.app.honeycomb.Shell\$HomeActivity".to_string());
+        let pack_name = "com.google.android.youtube".to_string();
         Self { intent, pack_name }
     }
 }
@@ -228,8 +235,11 @@ fn initial_setup(path: &Path) -> anyhow::Result<HashMap<String, Package>> {
 
     let playstore_label = "playstore".to_string();
     let settings_label = "settings".to_string();
+    let youtube_label = "yt".to_string();
+
     hm.insert(playstore_label, Package::playstore());
     hm.insert(settings_label, Package::settings());
+    hm.insert(youtube_label, Package::youtube());
 
     fs::write(path, to_vec_pretty(&hm)?)?;
     Ok(hm)
@@ -249,7 +259,9 @@ fn handle_change(
 ) -> anyhow::Result<HashMap<String, Package>> {
     let old_packs: HashSet<_> = m
         .values()
-        .filter(|&p| *p != Package::settings() && *p != Package::playstore())
+        .filter(|&p| {
+            *p != Package::settings() && *p != Package::playstore() && *p != Package::youtube()
+        })
         .map(|p| p.pack_name.clone())
         .collect();
     let new_packs: HashSet<_> = new_packs.into_iter().collect();
@@ -303,7 +315,7 @@ fn detect_change(tx: Sender<HashMap<String, Package>>, path: &Path) -> anyhow::R
 
         let pack_names = ret_pack_names(PKGS_CMD)?;
 
-        if m.len() - 2 != pack_names.len() {
+        if m.len() - EXTRA_PKG != pack_names.len() {
             let m = handle_change(path, m, pack_names)?;
             tx.send(m)?
         }

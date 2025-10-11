@@ -44,3 +44,30 @@ the resultant binary wiil be in `target/release/tx_launch`
  2. Download the binary<br>
  if you do not want to build it and you can download it from the releases section
            https://github.com/BayonetArch/tx_launch/releases
+
+# Usage #
+type `tx_launch --help` to see options.
+
+By default the tool will use termux `builtin am`(/data/data/com.termux/files/usr/bin/am) which uses jvm hence is very slow.
+if you want to use`new` am(termux-am) which is faster than the native you need to use the new apk builds of termux(github action builds) and also make sure you provide 'Display over other apps' permission to termux otherwise it won't work.
+and lastly `system` am will only work on android 10.it is the fastest.
+
+To change the `am` use :
+
+```bash
+tx_launch --am {new,old,system}
+
+```
+By default launching the tool will take you to repl where you can type app names to launch aps.if you want to launch app directly:
+
+```bash
+tx_launch --run {app_name}
+
+```
+# Example #
+
+```bash
+tx_launch --run playstore --am new # launch playstore using new am
+
+```
+

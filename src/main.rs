@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_vec_pretty};
+use spb::progress_bar;
 use std::{
     collections::{HashMap, HashSet},
     env::{self},
@@ -220,21 +221,28 @@ fn launch_app(match_str: &str, hm: &HashMap<String, Package>, am: &Am) -> anyhow
 }
 
 fn initial_setup(path: &Path) -> anyhow::Result<HashMap<String, Package>> {
-    println!("  setting up packages for the first time...");
-    println!("  it will take some time so please wait");
+    spb::initial_bar_setup();
+
+    println!("  Setting up packages for the first time...");
+    println!();
 
     let mut hm: HashMap<String, Package> = HashMap::new();
 
-    let initial_pkgs = format!("{PKGS_CMD} | tail -n 5");
+    let pack_names = ret_pack_names(PKGS_CMD)?;
+    let pack_len = pack_names.len();
 
-    let pack_names = ret_pack_names(&initial_pkgs)?;
-    for pack_name in pack_names {
+    for (c, pack_name) in pack_names.into_iter().enumerate() {
+        println!("  Adding `{pack_name}`");
+        progress_bar(pack_len, c + 1);
+
         let label = ret_label(&pack_name)?.to_ascii_lowercase(); // most expensive
         let intent = ret_intent(&pack_name)?;
         let pkg = Package { pack_name, intent };
 
         hm.insert(label, pkg);
     }
+
+    spb::restore_bar_setup();
 
     let playstore_label = "playstore".to_string();
     let settings_label = "settings".to_string();
@@ -528,7 +536,8 @@ fn main() -> anyhow::Result<()> {
         dir.create(JSON_PATH)?;
 
         let m = initial_setup(&path)?;
-        println!("  took {} secs", t.elapsed().as_secs());
+        println!("  Took {} secs", t.elapsed().as_secs());
+        println!();
         m
     };
 

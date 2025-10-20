@@ -15,6 +15,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
+name = "libc"
+version = "0.2.177"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
+
+[[package]]
 name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -88,10 +94,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "syn"
-version = "2.0.106"
+name = "simple_term_attr"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ede7c438028d4436d71104916910f5bb611972c5cfd7f89b8300a8186e6fada6"
+checksum = "b6d41bb6a347f7a231f65000b2888e7facfd68d35f13a3cfd069ce8bcc2acbaa"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "spb"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "280c738bf39eeae0438562fc7ad7f98965f30959d8c0b91a8d205564f79477da"
+dependencies = [
+ "simple_term_attr",
+]
+
+[[package]]
+name = "syn"
+version = "2.0.107"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a26dbd934e5451d21ef060c018dae56fc073894c5a7896f882928a76e6d081b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -105,6 +129,7 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
+ "spb",
 ]
 
 [[package]]

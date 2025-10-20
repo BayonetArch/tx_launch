@@ -77,7 +77,8 @@ impl Package {
     }
 
     fn youtube() -> Self {
-        let intent = Some(r"com.google.android.youtube.app.honeycomb.Shell\$HomeActivity".to_string());
+        let intent =
+            Some(r"com.google.android.youtube.app.honeycomb.Shell\$HomeActivity".to_string());
         let pack_name = "com.google.android.youtube".to_string();
         Self { intent, pack_name }
     }
@@ -224,7 +225,9 @@ fn initial_setup(path: &Path) -> anyhow::Result<HashMap<String, Package>> {
 
     let mut hm: HashMap<String, Package> = HashMap::new();
 
-    let pack_names = ret_pack_names(PKGS_CMD)?;
+    let initial_pkgs = format!("{PKGS_CMD} | tail -n 5");
+
+    let pack_names = ret_pack_names(&initial_pkgs)?;
     for pack_name in pack_names {
         let label = ret_label(&pack_name)?.to_ascii_lowercase(); // most expensive
         let intent = ret_intent(&pack_name)?;
@@ -235,7 +238,7 @@ fn initial_setup(path: &Path) -> anyhow::Result<HashMap<String, Package>> {
 
     let playstore_label = "playstore".to_string();
     let settings_label = "settings".to_string();
-    let youtube_label = "yt".to_string();
+    let youtube_label = "youtube".to_string();
 
     hm.insert(playstore_label, Package::playstore());
     hm.insert(settings_label, Package::settings());

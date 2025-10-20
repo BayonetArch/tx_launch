@@ -1,3 +1,10 @@
+/*
+ * tx_launch
+ * Copyright (c) 2025 BayonetArch
+ * 
+ * This software is released under the MIT License.
+ * See LICENSE file for details.
+ */
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_vec_pretty};
 use spb::progress_bar;

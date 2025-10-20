@@ -12,7 +12,7 @@ it uses cmd line tools like 'am'(activity manager) and 'pm'(package manager) for
 ### 1. Termux
 - **Source:** GitHub or F-Droid builds only
 
-### 2. AAPT
+### 2. aapt
 Command line tool for android asset packaging.
 
 **Installation:**
@@ -73,7 +73,7 @@ Download directly from the [Releases section](https://github.com/BayonetArch/tx_
 
 By default, the tool uses termux's built-in `am` (`/data/data/com.termux/files/usr/bin/am`), which runs on JVM and is very slow.
 
-#### Available AM Options:
+#### Available am Options:
 
 | Option | Description | Requirements |
 |--------|-------------|--------------|

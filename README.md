@@ -78,7 +78,7 @@ By default, the tool uses termux's built-in `am` (`/data/data/com.termux/files/u
 | Option | Description | Requirements |
 |--------|-------------|--------------|
 | `old` | default termux am (slowest) | None |
-| `new` | termux-am from gitHub action builds (faster) | gitHub action build of yermux + "Display over other apps" permission |
+| `new` | termux-am from gitHub action builds (faster) | gitHub action build of termux + "Display over other apps" permission |
 | `system` | system am (fastest) | android 10 only |
 
 **Change am:**

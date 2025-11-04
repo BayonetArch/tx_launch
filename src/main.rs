@@ -1,7 +1,7 @@
 /*
  * tx_launch
  * Copyright (c) 2025 BayonetArch
- * 
+ *
  * This software is released under the MIT License.
  * See LICENSE file for details.
  */
@@ -55,6 +55,8 @@ impl Default for Am {
         Self::termux_old()
     }
 }
+
+
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, PartialOrd, Hash, Clone)]
 struct Package {
@@ -123,6 +125,7 @@ impl EscAttr {
     }
 }
 
+// NOTE: this assumes every command is successfull.which is very bad..
 fn run_cmd(cmd: &str) -> anyhow::Result<String> {
     let shell = "/system/bin/sh";
 
@@ -184,7 +187,7 @@ fn launch_app(match_str: &str, hm: &HashMap<String, Package>, am: &Am) -> anyhow
     let mut b = true;
 
     if match_str == "list" || match_str == "ls" {
-        print_apps(hm);
+        print_apps()?;
         return Ok(b);
     } else if match_str == "help" {
         repl_help();
@@ -357,10 +360,11 @@ fn help_msg(name: &str) {
     println!();
 
     println!("options");
-    println!("  -a, --am        specify which am to use (default old)");
-    println!("  -r, --run       run an app directly");
-    println!("  -h, --help      print this help message");
-    println!("  -v, --version   print the binary version");
+    println!("  -a, --am         specify which am to use (default old)");
+    println!("  -r, --run        run an app directly");
+    println!("  -l, --list       list available apps");
+    println!("  -h, --help       print this help message");
+    println!("  -v, --version    print the binary version");
 
     println!();
     println!("available am values");
@@ -510,7 +514,10 @@ fn parse_args() -> anyhow::Result<String> {
         match x.as_str() {
             "--am" | "-a" => app = handle_am(&args, 2),
             "--run" | "-r" => app = handle_run(&args, 2),
-
+            "--list" | "-ls" => {
+                print_apps()?;
+                exit(0)
+            }
             "--help" | "-h" => help_msg(&args[0]),
             "--version" | "-v" => print_version(),
 
@@ -519,9 +526,17 @@ fn parse_args() -> anyhow::Result<String> {
     }
     Ok(app)
 }
-fn print_apps(map: &HashMap<String, Package>) {
-    let labels: Vec<_> = map.keys().collect();
-    println!("  {:#?}", labels);
+fn print_apps() -> anyhow::Result<()> {
+    let apps = fs::read_to_string(&format!("{JSON_PATH}/{JSON_NAME}"))?;
+    let map: HashMap<String, Package> = from_str(&apps)?;
+
+    println!();
+    println!("  {}", "—".repeat(20));
+    map.keys().for_each(|x| println!("  {x}"));
+    println!("  {}", "—".repeat(20));
+    println!();
+
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {

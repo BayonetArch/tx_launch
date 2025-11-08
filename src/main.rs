@@ -23,7 +23,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const VERSION: &'static str = "0.1.2";
+const VERSION: &'static str = "0.1.4";
 
 const JSON_PATH: &'static str = "/data/data/com.termux/files/home/.local/share";
 const JSON_NAME: &'static str = "pkgs.json";

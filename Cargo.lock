@@ -28,9 +28,9 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.101"
+version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89ae43fd86e4158d6db51ad8e2b80f313af9cc74f5c0e03ccb87de09998732de"
+checksum = "5ee95bc4ef87b8d5ba32e8b7714ccc834865276eab0aed5c9958d00ec45f49e8"
 dependencies = [
  "unicode-ident",
 ]
@@ -95,27 +95,27 @@ dependencies = [
 
 [[package]]
 name = "simple_term_attr"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6d41bb6a347f7a231f65000b2888e7facfd68d35f13a3cfd069ce8bcc2acbaa"
+checksum = "465390f71ea09745f20d021373624cb6a775221f68195bc508ecc0fe9bb65a4a"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "spb"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "280c738bf39eeae0438562fc7ad7f98965f30959d8c0b91a8d205564f79477da"
+checksum = "32caa99be4ec00f46f2de4fa5e7ee7e16f95e8fd0280453bcd61f7effb409ad2"
 dependencies = [
  "simple_term_attr",
 ]
 
 [[package]]
 name = "syn"
-version = "2.0.107"
+version = "2.0.108"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a26dbd934e5451d21ef060c018dae56fc073894c5a7896f882928a76e6d081b"
+checksum = "da58917d35242480a05c2897064da0a80589a2a0476c9a3f2fdc83b53502e917"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -129,11 +129,12 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
+ "simple_term_attr",
  "spb",
 ]
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.19"
+version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f63a545481291138910575129486daeaf8ac54aee4387fe7906919f7830c7d9d"
+checksum = "9312f7c4f6ff9069b165498234ce8be658059c6728633667c526e27dc2cf1df5"

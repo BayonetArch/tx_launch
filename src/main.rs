@@ -5,8 +5,11 @@
  * This software is released under the MIT License.
  * See LICENSE file for details.
  */
+
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_vec_pretty};
+use simple_term_attr::{StyleAttributes, clear_line, clear_screen};
 use spb::progress_bar;
 use std::{
     collections::{HashMap, HashSet},
@@ -15,10 +18,7 @@ use std::{
     io::{self, Write, stdout},
     path::{Path, PathBuf},
     process::{Command, Stdio, exit},
-    sync::{
-        LazyLock, Mutex,
-        mpsc::{self, Sender},
-    },
+    sync::mpsc::{self, Sender},
     thread,
     time::{Duration, Instant},
 };
@@ -31,32 +31,24 @@ const PKGS_CMD: &'static str = "/system/bin/pm list packages --user 0 -3 | cut -
 const PATH_CMD: &'static str = "/system/bin/pm path --user 0";
 const INTENT_CMD: &'static str = "/system/bin/pm resolve-activity --user 0";
 const AAPT_CMD: &'static str = "aapt dump badging";
-const EXTRA_PKG: usize = 3;
+const EXTRA_PKGS: usize = 3;
 
-static ACTMANAGER: LazyLock<Mutex<Am>> = std::sync::LazyLock::new(|| Mutex::new(Am::default()));
-
-#[derive(Debug, PartialEq)]
-struct Am(String);
-
-impl Am {
-    fn system() -> Self {
-        Self("/system/bin/am".to_string())
-    }
-    fn termux_old() -> Self {
-        Self("am".to_string())
-    }
-    fn termux_new() -> Self {
-        Self("termux-am".to_string())
-    }
+#[derive(Debug, Serialize, Deserialize)]
+struct Options {
+    am: String,
+    warn: bool,
+    running_app: Option<String>,
 }
 
-impl Default for Am {
+impl Default for Options {
     fn default() -> Self {
-        Self::termux_old()
+        Self {
+            am: "old".to_string(),
+            warn: true,
+            running_app: None,
+        }
     }
 }
-
-
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, PartialOrd, Hash, Clone)]
 struct Package {
@@ -88,40 +80,9 @@ impl Package {
 
     fn youtube() -> Self {
         let intent =
-            Some(r"com.google.android.youtube.app.honeycomb.Shell\$HomeActivity".to_string());
+            Some("com.google.android.youtube.app.honeycomb.Shell$HomeActivity".to_string());
         let pack_name = "com.google.android.youtube".to_string();
         Self { intent, pack_name }
-    }
-}
-
-struct EscAttr {}
-
-impl EscAttr {
-    fn red<'a>(bold: bool) -> &'a str {
-        if !bold { "\x1b[0;31m" } else { "\x1b[1;31m" }
-    }
-
-    fn green<'a>(bold: bool) -> &'a str {
-        if !bold { "\x1b[0;32m" } else { "\x1b[1;32m" }
-    }
-
-    fn yellow<'a>(bold: bool) -> &'a str {
-        if !bold { "\x1b[0;33m" } else { "\x1b[1;33m" }
-    }
-
-    fn _underline<'a>() -> &'a str {
-        "\x1b[4m"
-    }
-
-    fn clear_line<'a>() -> &'a str {
-        "\x1b[033[2k\r"
-    }
-    fn clear_screen<'a>() -> &'a str {
-        "\x1b[2J\x1b[H"
-    }
-
-    fn none<'a>() -> &'a str {
-        "\x1b[0m"
     }
 }
 
@@ -183,55 +144,59 @@ fn ret_intent(pn: &str) -> anyhow::Result<Option<String>> {
     }
 }
 
-fn launch_app(match_str: &str, hm: &HashMap<String, Package>, am: &Am) -> anyhow::Result<bool> {
-    let mut b = true;
+fn launch_app(
+    app: &str,
+    map: &HashMap<String, Package>,
+    am_opt_val: &str,
+    is_repl: bool,
+) -> anyhow::Result<()> {
+    if let Some(package) = map.get(app) {
+        let am_command = get_am_command(am_opt_val);
+        let package_name = &package.pack_name;
+        let intent = package.intent.as_deref().unwrap_or("none");
 
-    if match_str == "list" || match_str == "ls" {
-        print_apps()?;
-        return Ok(b);
-    } else if match_str == "help" {
-        repl_help();
-        return Ok(b);
-    } else if match_str == "clear" {
-        println!("{}", EscAttr::clear_screen());
-        return Ok(b);
-    }
-
-    let default = Package::default();
-    let p = hm.get(&match_str.to_string()).unwrap_or(&default);
-
-    if *p != default {
         let cmd = format!(
-            "{} start --user 0 {}/{}",
-            am.0,
-            p.pack_name,
-            p.intent.as_deref().unwrap_or("none")
+            "{} start --user 0 {}/'{}'", // '' to ignore expansions
+            am_command, package_name, intent
         );
 
-        eprintln!("  launching `{}`", p.pack_name);
-        let t1 = Instant::now();
+        eprintln!("  Launching `{}`", package.pack_name);
+        let t = Instant::now();
+
         run_cmd(&cmd)?;
-        let dur = t1.elapsed().as_millis();
-        println!("  took {dur} millisecs");
+
+        let dur = t.elapsed().as_millis();
+        println!("  Took {dur}ms");
+        if !is_repl {
+            exit(0);
+        }
     } else {
-        let sugg: Vec<_> = hm
+        let sugg: Vec<_> = map
             .keys()
-            .filter(|x| match_str.len() >= 2 && x.contains(match_str))
+            .filter(|x| app.len() >= 2 && x.contains(app))
             .collect();
 
         if !sugg.is_empty() {
-            eprintln!("  Did you mean ? {:?}", sugg);
+            eprintln!(" Did you mean {sugg:?}?");
+            if !is_repl {
+                exit(1);
+            }
+        } else if is_repl {
+            eprintln!("  No app or command named '{app}' found");
+            eprintln!("  Type 'ls' for listing all the apps");
+            eprintln!("  Type 'help' for more information")
         } else {
-            eprintln!("  no app '{}' found", match_str);
-            eprintln!("  type 'list|ls' to list all the apps");
-            b = false;
+            return Err(anyhow::anyhow!(
+                "No app '{app}' found,use '-ls' option for listing apps"
+            ));
         }
     }
-    Ok(b)
+
+    Ok(())
 }
 
 fn initial_setup(path: &Path) -> anyhow::Result<HashMap<String, Package>> {
-    spb::initial_bar_setup();
+    spb::initial_bar_setup()?;
 
     println!("  Setting up packages for the first time...");
     println!();
@@ -245,14 +210,20 @@ fn initial_setup(path: &Path) -> anyhow::Result<HashMap<String, Package>> {
         println!("  Adding `{pack_name}`");
         progress_bar(pack_len, c + 1);
 
-        let label = ret_label(&pack_name)?.to_ascii_lowercase(); // most expensive
+        let mut label = ret_label(&pack_name)?.to_ascii_lowercase(); // most expensive
         let intent = ret_intent(&pack_name)?;
+
+        if pack_name == "app.revanced.android.youtube" {
+            // NOTE: Hardcoded only for youtube revanced
+            label = "youtube_revanced".to_string();
+        }
+
         let pkg = Package { pack_name, intent };
 
         hm.insert(label, pkg);
     }
 
-    spb::restore_bar_setup();
+    spb::restore_bar_setup()?;
 
     let playstore_label = "playstore".to_string();
     let settings_label = "settings".to_string();
@@ -276,28 +247,26 @@ fn retrive_packs(path: &Path) -> anyhow::Result<HashMap<String, Package>> {
 fn handle_change(
     path: &Path,
     mut m: HashMap<String, Package>,
-    new_packs: Vec<String>,
+    new_pack_names: Vec<String>,
 ) -> anyhow::Result<HashMap<String, Package>> {
-    let old_packs: HashSet<_> = m
+    let old_pack_names: HashSet<_> = m
         .values()
         .filter(|&p| {
             *p != Package::settings() && *p != Package::playstore() && *p != Package::youtube()
         })
         .map(|p| p.pack_name.clone())
         .collect();
-    let new_packs: HashSet<_> = new_packs.into_iter().collect();
+    let new_pack_names: HashSet<_> = new_pack_names.into_iter().collect();
 
-    let added: Vec<_> = new_packs.difference(&old_packs).collect();
-    let removed: Vec<_> = old_packs.difference(&new_packs).collect();
+    // Find difference between old Package names and new Package names
+    // to get the changed Package names.
+    let added_pack_names: Vec<_> = new_pack_names.difference(&old_pack_names).collect();
+    let removed_pack_names: Vec<_> = old_pack_names.difference(&new_pack_names).collect();
 
-    for ap in added {
-        eprint!(
-            "{}{}  added{} '{ap}'",
-            EscAttr::clear_line(),
-            EscAttr::green(false),
-            EscAttr::none()
-        );
-        prompt("\n")?;
+    for ap in added_pack_names {
+        clear_line()?;
+        eprint!("  added {}", ap.green());
+        prompt(Some("\n"))?;
 
         let label = ret_label(ap)?.to_ascii_lowercase();
         let intent = ret_intent(ap)?;
@@ -308,14 +277,10 @@ fn handle_change(
         m.insert(label, pack);
     }
 
-    for rp in removed {
-        eprint!(
-            "{}{}  removed{} '{rp}'",
-            EscAttr::clear_line(),
-            EscAttr::red(true),
-            EscAttr::none()
-        );
-        prompt("\n")?;
+    for rp in removed_pack_names {
+        clear_line()?;
+        eprint!("  removed {}", rp.green());
+        prompt(Some("\n"))?;
 
         if let Some((k, _)) = m.iter().find(|(_, v)| v.pack_name == *rp) {
             let key = k.clone();
@@ -336,7 +301,7 @@ fn detect_change(tx: Sender<HashMap<String, Package>>, path: &Path) -> anyhow::R
 
         let pack_names = ret_pack_names(PKGS_CMD)?;
 
-        if m.len() - EXTRA_PKG != pack_names.len() {
+        if m.len() - EXTRA_PKGS != pack_names.len() {
             let m = handle_change(path, m, pack_names)?;
             tx.send(m)?
         }
@@ -345,206 +310,86 @@ fn detect_change(tx: Sender<HashMap<String, Package>>, path: &Path) -> anyhow::R
     Ok(())
 }
 
-fn prompt(extra: &str) -> anyhow::Result<()> {
-    print!("{}  {}>{} ", extra, EscAttr::green(true), EscAttr::none());
+fn prompt(extra: Option<&str>) -> anyhow::Result<()> {
+    if let Some(extra) = extra {
+        print!("{extra}  {}", "> ".green_bold());
+    } else {
+        print!("  {}", "> ".green_bold());
+    }
+
     stdout().flush()?;
     Ok(())
 }
 
-fn help_msg(name: &str) {
-    println!("tx_launch v{VERSION}");
-    println!("a cli tool to launch android apps\n");
+fn parse_args() -> anyhow::Result<Options> {
+    let mut opts = Options::default();
+    let am_opts = vec!["old", "system", "new"];
 
-    println!("usage");
-    println!("  {} [flags] ...", name);
-    println!();
+    let mut args = env::args();
+    let program_name = args.next().unwrap_or("Non_existent_program".to_string());
 
-    println!("options");
-    println!("  -a, --am         specify which am to use (default old)");
-    println!("  -r, --run        run an app directly");
-    println!("  -l, --list       list available apps");
-    println!("  -h, --help       print this help message");
-    println!("  -v, --version    print the binary version");
-
-    println!();
-    println!("available am values");
-    println!("  old    use the legacy termux am slow but included in stable termux releases");
-    println!(
-        "  system use the system am (/system/bin/am) fastest but incompatible with android 11+"
-    );
-    println!(
-        "  new    use the new termux am (github action builds only) which is faster than old termux"
-    );
-    println!();
-    println!("example");
-    println!("  '{} --am new --run tiktok'", name);
-    println!("the above example uses new am and runs tiktok");
-    exit(0);
-}
-fn print_version() {
-    println!("v{VERSION}");
-    exit(0);
-}
-
-fn repl_help() {
-    let link = "https://github.com/BayonetArch/tx_launch";
-
-    println!();
-    println!("  launch apps by typing out their labels.");
-    println!("  type 'list|ls' to print all the app labels.");
-    println!("  type 'clear' to clear the repl");
-    println!("  if launching apps is too slow consider changing the am");
-    println!(
-        "  guide for 'am':{}{}{}",
-        EscAttr::green(false),
-        link,
-        EscAttr::none()
-    );
-    println!();
-}
-
-fn incompatible_warning(sdk: u8) {
-    eprintln!(
-        "  {}Warning{}: SDK VERSION is higher than expected for system am",
-        EscAttr::yellow(true),
-        EscAttr::none()
-    );
-    eprintln!("  Expected: 29 or lower");
-    eprintln!("  Found: {}", sdk);
-    eprintln!("  Note: apps may not run  on this version.");
-    eprintln!();
-}
-
-fn legacy_warning() {
-    eprintln!(
-        "  {}Warning{}: Using the legacy am.",
-        EscAttr::yellow(true),
-        EscAttr::none(),
-    );
-    eprintln!("  launching apps will be slow");
-    println!();
-}
-
-fn unknown_opt(s: &str) {
-    eprintln!(
-        "  Unknown option '{}'  try '--help' for more  information",
-        s
-    );
-    exit(1);
-}
-
-fn unkown_val(s: &str) {
-    eprintln!(
-        "  Unknown value '{}'  try '--help' for more  information",
-        s
-    );
-    exit(1);
-}
-
-fn no_val() {
-    eprintln!("  No value provided try '--help' for more  information");
-    exit(1);
-}
-
-fn handle_am(args: &Vec<String>, i: usize) -> String {
-    let mut app = String::new();
-
-    if let Some(s) = args.get(i) {
-        match s.as_str() {
-            "new" => {
-                let mut a = ACTMANAGER.lock().unwrap();
-                *a = Am::termux_new();
+    while let Some(opt) = args.next() {
+        #[rustfmt::skip]
+        match opt.as_str() {
+            "--help" | "-h"     => messages::help_msg(&program_name),
+            "--version" | "-v"  => messages::print_version(),
+            "--no-warn" | "-nw" => opts.warn = false,
+            "--list" | "-ls"    => {
+                messages::print_apps()?;
+                exit(0);
             }
-            "old" => {
-                let mut a = ACTMANAGER.lock().unwrap();
-                *a = Am::termux_old();
-            }
-
-            "system" => {
-                let mut a = ACTMANAGER.lock().unwrap();
-                *a = Am::system();
-            }
-
-            x => unkown_val(x),
-        }
-        if let Some(sec_flag) = args.get(i + 1) {
-            match sec_flag.as_str() {
-                "--run" | "-r" => app = handle_run(args, i + 2),
-                x => unknown_opt(x),
-            }
-        }
-    } else {
-        no_val();
-    }
-    app
-}
-
-fn handle_run(args: &Vec<String>, i: usize) -> String {
-    let mut app = String::new();
-
-    if let Some(a) = args.get(i) {
-        match a.as_str() {
-            x => app = x.to_ascii_lowercase(),
-        }
-
-        if let Some(sec_flag) = args.get(i + 1) {
-            match sec_flag.as_str() {
-                "--am" | "-a" => {
-                    let _ = handle_am(&args, i + 2);
+            "--run" | "-r"      => {
+                if let Some(app_name) = args.next() {
+                    let app_name = app_name.to_ascii_lowercase().trim_start().to_string();
+                    opts.running_app = Some(app_name);
+                } else {
+                    messages::no_val();
                 }
-                x => unknown_opt(x),
             }
-        }
-    } else {
-        no_val();
-    }
-    app
-}
-//TODO: somehow get rid of this bruteforced arg parsing
-fn parse_args() -> anyhow::Result<String> {
-    let mut app = String::new();
-
-    let args: Vec<_> = env::args().collect();
-
-    if args.len() < 2 {
-        return Ok(app);
-    }
-
-    if let Some(x) = args.get(1) {
-        match x.as_str() {
-            "--am" | "-a" => app = handle_am(&args, 2),
-            "--run" | "-r" => app = handle_run(&args, 2),
-            "--list" | "-ls" => {
-                print_apps()?;
-                exit(0)
+            "--am" | "-a"       => {
+                if let Some(am_val) = args.next() {
+                    opts.am = am_val;
+                }
             }
-            "--help" | "-h" => help_msg(&args[0]),
-            "--version" | "-v" => print_version(),
 
-            x => unknown_opt(x),
-        }
+            opt                 => messages::unknown_opt(opt),
+        };
     }
-    Ok(app)
+
+    if !am_opts.contains(&opts.am.as_str()) {
+        messages::unknown_val(&opts.am);
+    }
+
+    Ok(opts)
 }
-fn print_apps() -> anyhow::Result<()> {
-    let apps = fs::read_to_string(&format!("{JSON_PATH}/{JSON_NAME}"))?;
-    let map: HashMap<String, Package> = from_str(&apps)?;
+#[rustfmt::skip]
+fn get_am_command(am_opt_val: &str) -> String {
+    match am_opt_val {
+        "old"    => "am".to_string(),
+        "new"    => "termux-am".to_string(),
+        "system" => "/system/bin/am".to_string(),
+        _        => "am".to_string(),
+    }
+}
 
-    println!();
-    println!("  {}", "—".repeat(20));
-    map.keys().for_each(|x| println!("  {x}"));
-    println!("  {}", "—".repeat(20));
-    println!();
+fn check_sdk_version() -> Result<()> {
+    let sdk = run_cmd("/system/bin/getprop ro.build.version.sdk")?;
 
+    if let Ok(sdk) = sdk.trim().parse::<u8>() {
+        if sdk > 29 {
+            messages::incompatible_warning(sdk);
+        }
+    };
     Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
-    let app = parse_args()?;
-    let am = ACTMANAGER.lock().unwrap();
+    let opts = parse_args()?;
+    let app_opt_val = opts.running_app;
+    let am_opt_val = opts.am;
+    let warn = opts.warn;
 
-    let path_str = format!("{JSON_PATH}/{JSON_NAME}");
-    let path = PathBuf::from(path_str);
+    let path = PathBuf::from(format!("{JSON_PATH}/{JSON_NAME}"));
 
     let (tx, rx) = mpsc::channel();
 
@@ -553,36 +398,28 @@ fn main() -> anyhow::Result<()> {
     } else {
         let t = Instant::now();
 
-        let mut dir = DirBuilder::new();
-        dir.recursive(true);
-        dir.create(JSON_PATH)?;
+        DirBuilder::new().recursive(true).create(JSON_PATH)?;
 
         let m = initial_setup(&path)?;
-        println!("  Took {} secs", t.elapsed().as_secs());
+        println!("  Took {}s", t.elapsed().as_secs());
         println!();
         m
     };
 
     thread::spawn(move || detect_change(tx, &path));
 
-    if *am == Am::default() {
-        legacy_warning();
-    }
+    #[rustfmt::skip]
+    match am_opt_val.as_str() {
+        "old" if warn    => messages::legacy_warning(),
+        "system" if warn => check_sdk_version()?,
+        _                => {}
+    };
 
-    if *am == Am::system() {
-        let sdk = run_cmd("/system/bin/getprop ro.build.version.sdk")?;
-
-        if let Ok(sdk) = sdk.trim().parse::<u8>() {
-            if sdk > 29 {
-                incompatible_warning(sdk);
-            }
-        }
-    }
-
-    if app.is_empty() {
-        println!("  enter app name to launch it");
-        println!("  type 'help' for more information");
-        println!("  you can exit by entering 'q'");
+    if app_opt_val.is_none() {
+        println!("  Enter app name to launch it");
+        println!("  Type 'help' for more information");
+        println!("  Exit by typing 'q");
+        println!();
     }
 
     loop {
@@ -593,25 +430,140 @@ fn main() -> anyhow::Result<()> {
             }
             _ => {}
         }
-
-        if !app.is_empty() {
-            if !launch_app(&app, &map, &am)? {
-                exit(1);
-            };
-            exit(0);
+        // Command line app launch
+        if let Some(app) = &app_opt_val {
+            launch_app(app, &map, &am_opt_val, false)?;
         }
 
-        let mut match_str = String::new();
-        prompt("")?;
-        io::stdin().read_line(&mut match_str)?;
-        let match_str = match_str.trim().to_ascii_lowercase();
+        // for repl
+        let mut repl_input = String::new();
+        prompt(None)?;
+        io::stdin().read_line(&mut repl_input)?;
+        let repl_input = repl_input.trim().to_ascii_lowercase();
 
-        if match_str == "q" {
-            break;
-        }
-        if !match_str.is_empty() {
-            launch_app(&match_str, &map, &am)?;
-        }
+        #[rustfmt::skip]
+        match repl_input.as_str() {
+            "quit" | "q"           => break,
+            "list" | "ls"          => messages::print_apps()?,
+            "help" | "h" if warn   => messages::repl_help(),
+            "clear" | "cl"         => clear_screen()?,
+            app if !app.is_empty() => launch_app(app, &map, &am_opt_val, true)?,
+            _                      => {}
+        };
     }
     Ok(())
+}
+
+mod messages {
+    use super::*;
+
+    pub fn legacy_warning() {
+        eprintln!("  {}: Using the legacy am.", "Warning".yellow_bold());
+        eprintln!("  launching apps will be slow");
+        println!();
+    }
+
+    pub fn repl_help() {
+        let link = "https://github.com/BayonetArch/tx_launch";
+
+        println!("  Launch apps by typing out their labels.");
+        println!();
+
+        println!("  Commands:");
+        println!("    ls,list     list all apps");
+        println!("    cl,clear    clear the repl");
+        println!("    q,quit      exit the repl");
+        println!("    h,help      print this help message");
+        println!();
+
+        println!(
+            "  {}: Launching apps will be slow if you are using default am.",
+            "NOTE".blue_bold()
+        );
+        println!("  consider changing the am");
+        println!("  more information can be found here:\n  {}", link.green(),);
+        println!();
+    }
+
+    pub fn help_msg(name: &str) {
+        println!("tx_launch v{VERSION}");
+        println!("a cli tool to launch android apps\n");
+
+        println!("usage");
+        println!("  {} [flags] ...", name);
+        println!();
+
+        println!("options");
+        println!("  -a, --am  <value>            specify which am to use (default old)");
+        println!("  -r, --run <app_name>         run an app directly");
+        println!("  -ls, --list                  list available apps");
+        println!("  -nw, --no-warn               supress all the warning messages");
+        println!("  -h, --help                   print this help message");
+        println!("  -v, --version                print the binary version");
+
+        println!();
+        println!("available am values");
+        println!("  old    use the legacy termux am slow but included in stable termux releases");
+        println!(
+            "  system use the system am (/system/bin/am) fastest but incompatible with android 11+"
+        );
+        println!(
+            "  new    use the new termux am (github action builds only) which is faster than old termux"
+        );
+        println!();
+        println!("example");
+        println!("  '{} --am new --run tiktok'", name);
+        println!("the above example uses new am and runs tiktok");
+        exit(0);
+    }
+
+    pub fn print_version() {
+        println!("v{VERSION}");
+        exit(0);
+    }
+
+    pub fn unknown_opt(s: &str) {
+        eprintln!(
+            "  Unknown option '{}'  try '--help' for more  information",
+            s
+        );
+        exit(1);
+    }
+
+    pub fn unknown_val(s: &str) {
+        eprintln!(
+            "  Unknown value '{}'  try '--help' for more  information",
+            s
+        );
+        exit(1);
+    }
+
+    pub fn no_val() {
+        eprintln!("  No value provided try '--help' for more  information");
+        exit(1);
+    }
+
+    pub fn incompatible_warning(sdk: u8) {
+        eprintln!(
+            "  {}: SDK VERSION is higher than expected for system am",
+            "Warning".yellow_bold()
+        );
+        eprintln!("  Expected: 29 or lower");
+        eprintln!("  Found: {}", sdk);
+        eprintln!("  Note: apps may not run  on this version.");
+        eprintln!();
+    }
+
+    pub fn print_apps() -> anyhow::Result<()> {
+        let apps = fs::read_to_string(&format!("{JSON_PATH}/{JSON_NAME}"))?;
+        let map: HashMap<String, Package> = from_str(&apps)?;
+
+        println!();
+        println!("  {}", "—".repeat(20));
+        map.keys().for_each(|x| println!("  {x}"));
+        println!("  {}", "—".repeat(20));
+        println!();
+
+        Ok(())
+    }
 }

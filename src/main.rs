@@ -445,7 +445,7 @@ fn main() -> anyhow::Result<()> {
         match repl_input.as_str() {
             "quit" | "q"           => break,
             "list" | "ls"          => messages::print_apps()?,
-            "help" | "h" if warn   => messages::repl_help(),
+            "help" | "h"           => messages::repl_help(),
             "clear" | "cl"         => clear_screen()?,
             app if !app.is_empty() => launch_app(app, &map, &am_opt_val, true)?,
             _                      => {}

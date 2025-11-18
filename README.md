@@ -9,12 +9,9 @@ it uses cmd line tools like 'am'(activity manager) and 'pm'(package manager) for
 
 ## Prerequisites
 
-### 1. Termux
-- **Source:** GitHub or F-Droid builds only
+### 1. Termux From github or Fdroid
 
-### 2. aapt
-Command line tool for android asset packaging.
-
+### 2. aapt 
 **Installation:**
 ```bash
 apt install aapt -y
@@ -30,10 +27,6 @@ Download from either:
 ## Installation
 
 ### Option 1: Building from Source
-
-**Requirements:**
-- rust installed in termux
-
 **Steps:**
 
 1. Install Rust:
@@ -78,7 +71,7 @@ By default, the tool uses termux's built-in `am` (`/data/data/com.termux/files/u
 | Option | Description | Requirements |
 |--------|-------------|--------------|
 | `old` | default termux am (slowest) | None |
-| `new` | termux-am from gitHub action builds (faster) | gitHub action build of termux + "Display over other apps" permission |
+| `new` | termux-am from github action builds (faster) | github action build of termux + "Display over other apps" permission |
 | `system` | system am (fastest) | android 10 only |
 
 **Change am:**

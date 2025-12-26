@@ -23,7 +23,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const VERSION: &'static str = "0.1.4";
+const VERSION: &'static str = "0.1.5";
 
 const JSON_PATH: &'static str = "/data/data/com.termux/files/home/.local/share";
 const JSON_NAME: &'static str = "pkgs.json";
@@ -102,6 +102,24 @@ fn run_cmd(cmd: &str) -> anyhow::Result<String> {
     Ok(String::from_utf8(out)?)
 }
 
+fn run_cmd_err(cmd: &str) -> anyhow::Result<String> {
+    let shell = "/system/bin/sh";
+
+    let out = Command::new(shell)
+        .arg("-c")
+        .arg(cmd)
+        .stdout(Stdio::piped())
+        .stdin(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()?;
+
+    if out.status.success() {
+        Ok(String::from_utf8(out.stdout)?)
+    } else {
+        Err(anyhow::anyhow!(String::from_utf8(out.stderr)?))
+    }
+}
+
 fn ret_pack_names(cmd: &str) -> anyhow::Result<Vec<String>> {
     let cmd_out = run_cmd(cmd)?;
     let pack_names = cmd_out.lines().map(|x| x.to_string()).collect();
@@ -163,7 +181,7 @@ fn launch_app(
         eprintln!("  Launching `{}`", package.pack_name);
         let t = Instant::now();
 
-        run_cmd(&cmd)?;
+        run_cmd_err(&cmd)?;
 
         let dur = t.elapsed().as_millis();
         println!("  Took {dur}ms");
@@ -195,7 +213,19 @@ fn launch_app(
     Ok(())
 }
 
+fn check_aapt() -> anyhow::Result<String> {
+    match run_cmd_err("command -v aapt") {
+        Err(_) => {
+            eprintln!("  Installing aapt..");
+            run_cmd_err("apt install aapt -y ")
+        }
+        Ok(_) => Ok(String::default()),
+    }
+}
+
 fn initial_setup(path: &Path) -> anyhow::Result<HashMap<String, Package>> {
+    check_aapt()?;
+
     spb::initial_bar_setup()?;
 
     println!("  Setting up packages for the first time...");

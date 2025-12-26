@@ -555,8 +555,15 @@ mod messages {
     }
 
     pub fn print_apps() -> anyhow::Result<()> {
-        let apps = fs::read_to_string(&format!("{JSON_PATH}/{JSON_NAME}"))?;
-        let map: HashMap<String, Package> = from_str(&apps)?;
+        let path = PathBuf::from(format!("{JSON_PATH}/{JSON_NAME}"));
+        let map: HashMap<String, Package>;
+
+        if !path.exists() {
+            map = initial_setup(&path)?;
+        } else {
+            let apps = fs::read_to_string(&path)?;
+            map = from_str(&apps)?;
+        }
 
         println!();
         println!("  {}", "—".repeat(20));

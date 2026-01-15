@@ -1,6 +1,6 @@
 /*
  * tx_launch
- * Copyright (c) 2025 BayonetArch
+ * Copyright (c) 2026 BayonetArch
  *
  * This software is released under the MIT License.
  * See LICENSE file for details.

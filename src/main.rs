@@ -309,7 +309,7 @@ fn handle_change(
 
     for rp in removed_pack_names {
         clear_line()?;
-        eprint!("  removed {}", rp.green());
+        eprint!("  removed {}", rp.red());
         prompt(Some("\n"))?;
 
         if let Some((k, _)) = m.iter().find(|(_, v)| v.pack_name == *rp) {

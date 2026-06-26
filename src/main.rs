@@ -414,6 +414,12 @@ fn check_sdk_version() -> Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
+    #[cfg(not(any(target_arch = "aarch64", target_arch = "arm")))]
+    {
+        eprintln!("Unsupported Arch. this program only works on termux with aarch64 or arm arch.");
+        exit(1);
+    }
+
     let opts = parse_args()?;
     let app_opt_val = opts.running_app;
     let am_opt_val = opts.am;

@@ -416,7 +416,7 @@ fn check_sdk_version() -> Result<()> {
 fn main() -> anyhow::Result<()> {
     #[cfg(not(any(target_arch = "aarch64", target_arch = "arm")))]
     {
-        eprintln!("Unsupported Arch. this program only works on termux with aarch64 or arm arch.");
+        eprintln!("Error: Unsupported Arch. this program only works on termux with aarch64 or arm arch.");
         exit(1);
     }
 
@@ -529,7 +529,7 @@ mod messages {
         println!("  {} [flags] ...", name);
         println!();
 
-        println!("options");
+        println!("flags");
         println!("  -a, --am  <value>            specify which am to use (default old)");
         println!("  -r, --run <app_name>         run an app directly");
         println!("  -ls, --list                  list available apps");
